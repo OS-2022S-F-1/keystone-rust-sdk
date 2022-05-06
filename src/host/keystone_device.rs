@@ -1,8 +1,4 @@
-use std::sync::Arc;
-use super::common::{
-    KEYSTONE_DEV_PATH, KEYSTONE_ENCLAVE_EDGE_CALL_HOST,
-    KEYSTONE_ENCLAVE_INTERRUPTED, KEYSTONE_ENCLAVE_DONE
-};
+use super::common::{KEYSTONE_ENCLAVE_EDGE_CALL_HOST, KEYSTONE_ENCLAVE_INTERRUPTED, KEYSTONE_ENCLAVE_DONE};
 use super::error::Error;
 use super::params::Params;
 use super::keystone_user::{
@@ -13,8 +9,8 @@ use super::keystone_user::{
 use super::syscall::{ioctl, mmap, PROT_READ, PROT_WRITE, MAP_SHARED};
 
 pub trait KeystoneDevice: Drop {
-    fn new() -> Self;
-    fn get_phys_addr(&self) -> usize { self.physAddr }
+    fn new() -> Self where Self: Sized;
+    fn get_phys_addr(&self) -> usize;
     fn init_device(&mut self, params: &Params) -> bool;
     fn create(&mut self, min_pages: u64) -> Error;
     fn init_utm(&mut self, size: usize) -> usize;
@@ -50,7 +46,11 @@ impl PhysicalKeystoneDevice {
             request = KEYSTONE_IOC_RUN_ENCLAVE;
         }
 
-        if ioctl(self.fd as usize, request, &mut encl as *mut u8) {
+        if ioctl(
+            self.fd as usize,
+            request,
+            &mut encl as *mut KeystoneIoctlRunEnclave as *mut u8
+        ) != 0 {
             return error;
         }
 
@@ -78,11 +78,24 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         }
     }
 
+    fn get_phys_addr(&self) -> usize {
+        self.phys_addr
+    }
+
+    fn init_device(&mut self, _: &Params) -> bool {
+        // fd is set to 666 in OS kernel
+        true
+    }
+
     fn create(&mut self, min_pages: u64) -> Error {
         let mut encl = KeystoneIoctlCreateEnclave::new();
         encl.min_pages = min_pages as usize;
 
-        if ioctl(self.fd as usize, KEYSTONE_IOC_CREATE_ENCLAVE, &mut encl as *mut u8) {
+        if ioctl(
+            self.fd as usize,
+            KEYSTONE_IOC_CREATE_ENCLAVE,
+            &mut encl as *mut KeystoneIoctlCreateEnclave as *mut u8
+        ) != 0 {
             println!("ioctl error");
             self.eid = -1;
             Error::IoctlErrorCreate
@@ -98,7 +111,11 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         encl.eid = self.eid as usize;
         encl.params.untrusted_size = size;
 
-        if ioctl(self.fd as usize, KEYSTONE_IOC_UTM_INIT, &mut encl as *mut u8) {
+        if ioctl(
+            self.fd as usize,
+            KEYSTONE_IOC_UTM_INIT,
+            &mut encl as *mut KeystoneIoctlCreateEnclave as *mut u8
+        ) != 0 {
             0
         } else {
             encl.utm_free_ptr
@@ -113,7 +130,11 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         encl.free_paddr = free_phys_addr;
         encl.params = params;
 
-        if ioctl(self.fd as usize, KEYSTONE_IOC_FINALIZE_ENCLAVE, &mut encl as *mut u8) {
+        if ioctl(
+            self.fd as usize,
+            KEYSTONE_IOC_FINALIZE_ENCLAVE,
+            &mut encl as *mut KeystoneIoctlCreateEnclave as *mut u8
+        ) != 0 {
             println!("ioctl error");
             Error::IoctlErrorFinalize
         } else {
@@ -125,11 +146,15 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         let mut encl = KeystoneIoctlCreateEnclave::new();
         encl.eid = self.eid as usize;
 
-        if eid < 0 {
+        if self.eid < 0 {
             return Error::Success;
         }
 
-        if ioctl(self.fd as usize, KEYSTONE_IOC_DESTROY_ENCLAVE, &mut encl as *mut u8) {
+        if ioctl(
+            self.fd as usize,
+            KEYSTONE_IOC_DESTROY_ENCLAVE,
+            &mut encl as *mut KeystoneIoctlCreateEnclave as *mut u8
+        ) != 0 {
             println!("ioctl error");
             Error::IoctlErrorDestroy
         } else {
@@ -146,14 +171,9 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
     }
 
     fn map(&mut self, addr: usize, size: usize) -> isize {
-        let ret = mmap(0, (size & (!(1 << 48))) | (self.eid << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
+        let ret = mmap(0, (size & (!(1 << 48))) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
         assert_ne!(ret, -1);
         ret
-    }
-
-    fn init_device(&mut self, _: &Params) -> bool {
-        // fd is set to 666 in OS kernel
-        true
     }
 }
 
@@ -161,7 +181,7 @@ pub struct MockKeystoneDevice {
     eid: i32,
     phys_addr: usize,
     fd: i32,
-    shared_buffer: Option<Arc<Vec<u8>>>,
+    shared_buffer: Option<Vec<u8>>,
 }
 
 impl Drop for MockKeystoneDevice {
@@ -180,6 +200,10 @@ impl KeystoneDevice for MockKeystoneDevice {
             fd: 0,
             shared_buffer: None,
         }
+    }
+
+    fn get_phys_addr(&self) -> usize {
+        self.phys_addr
     }
 
     fn init_device(&mut self, _: &Params) -> bool {
@@ -211,9 +235,10 @@ impl KeystoneDevice for MockKeystoneDevice {
         Error::Success
     }
 
-    fn map(&mut self, _: usize, size: usize) -> Arc<Vec<u8>> {
-        let ptr = Arc::new(vec![0u8; usize]);
-        self.shared_buffer = Some(ptr.clone());
-        ptr
+    fn map(&mut self, _: usize, size: usize) -> isize {
+        let mut buffer = vec![0u8; size];
+        let ret = buffer.as_mut_ptr() as isize;
+        self.shared_buffer = Some(buffer);
+        ret
     }
 }

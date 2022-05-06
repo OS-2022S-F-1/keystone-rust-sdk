@@ -1,7 +1,7 @@
 /// zCore has removed crate `linux-user`, so there is no syscall function to use
 /// these functions are syscalls used in keystone
 
-use super::ioctl::{_IOR, SYS_IOCTL};
+use super::ioctl::{SYS_IOCTL};
 
 pub const SYSCALL_MMAP: usize = 222;
 pub const PROT_NONE: usize = 0x00;

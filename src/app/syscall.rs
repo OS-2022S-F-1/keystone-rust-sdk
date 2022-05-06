@@ -9,7 +9,7 @@ const SYSCALL_EXIT: usize = 1011;
 
 #[inline]
 fn syscall(which: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) -> usize {
-    let mut ret = 0;
+    let mut ret;
     unsafe {
         core::arch::asm!(
             "ecall",
@@ -25,7 +25,7 @@ fn syscall(which: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg
 }
 
 pub fn ocall(call_id: usize, data: *const u8, data_len: usize, return_buffer: *mut u8, return_len: usize) -> usize {
-    syscall(SYSCALL_OCALL, call_id, data as usize, data_len, return_len, return_len)
+    syscall(SYSCALL_OCALL, call_id, data as usize, data_len, return_buffer as usize, return_len)
 }
 
 pub fn copy_from_shared(dst: *mut u8, offset: usize, data_len: usize) -> usize {

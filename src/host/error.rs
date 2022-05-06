@@ -1,3 +1,4 @@
+#[derive(PartialEq)]
 pub enum Error {
     Success = 0,
     FileInitFailure,

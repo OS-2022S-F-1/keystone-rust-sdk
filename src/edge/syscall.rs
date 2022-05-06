@@ -17,14 +17,14 @@ pub struct SargsSysOpenat {
     pub dirfd: i32,
     pub flags: i32,
     pub mode: i32,
-    pub path: *const i8,
+    pub path: *const u8,
 }
 
 pub struct SargsSysUnlinkat {
     pub dirfd: i32,
     pub flags: i32,
     pub mode: i32,
-    pub path: *const i8,
+    pub path: *const u8,
 }
 
 pub struct SargsSysWrite {
@@ -62,7 +62,7 @@ pub struct SargesSysFstatat {
     pub dirfd: i32,
     pub flags: i32,
     pub stats: libc::stat,
-    pub pathname: *const i8,
+    pub pathname: *const u8,
 }
 
 impl EdgeCallHandler {
@@ -77,7 +77,7 @@ impl EdgeCallHandler {
 
         edge_call.return_data.call_status = CallStatus::Ok;
 
-        let mut ret: i32;
+        let ret: i32;
 
         let syscall_info = unsafe{ &*(syscall_info as *const EdgeSyscall) };
         match syscall_info.syscall_num {

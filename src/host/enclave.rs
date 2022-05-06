@@ -1,18 +1,15 @@
 use libc;
-use core::panicking::panic;
-use std::cmp::min;
-use std::mem::size_of;
+use std::{mem::size_of, rc::Rc, cell::RefCell};
 use elf::{ElfFile, PT_LOAD};
 use crate::common::sha3::MDSIZE;
-use crate::host::keystone_device::PhysicalKeystoneDevice;
 use super::common::{
     RT_NOEXEC, USER_NOEXEC, UTM_FULL, PAGE_BITS, PAGE_SIZE,
     round_up, round_down, page_down, page_up, is_aligned
 };
 use super::error::Error;
-use super::params::{DEFAULT_STACK_START, DEFAULT_STACK_SIZE, Params};
+use super::params::Params;
 use super::keystone_user::RuntimeParams;
-use super::keystone_device::{KeystoneDevice, MockKeystoneDevice};
+use super::keystone_device::{KeystoneDevice, PhysicalKeystoneDevice, MockKeystoneDevice};
 use super::memory::{HashContext, RISCV_PGLEVEL_TOP, Memory};
 use super::physical_enclave_memory::PhysicalEnclaveMemory;
 use super::simulated_enclave_memory::SimulatedEnclaveMemory;
@@ -23,14 +20,14 @@ pub struct Enclave {
     params: Params,
     runtime_file: Option<ElfFile>,
     enclave_file: Option<ElfFile>,
-    p_memory: *mut dyn Memory,
-    p_device: *mut dyn KeystoneDevice,
+    p_memory: Option<Box<dyn Memory>>,
+    p_device: Option<Rc<RefCell<dyn KeystoneDevice>>>,
     hash: [u8; MDSIZE],
     hash_ctx: Option<HashContext>,
     runtime_stk_sz: usize,
     shared_buffer: *mut u8,
     shared_buffer_size: usize,
-    o_func_dispatch: Option<OcallFunc>,
+    o_func_dispatch: Option<OCallFunc>,
 }
 
 impl Enclave {
@@ -39,7 +36,7 @@ impl Enclave {
             return true;
         }
 
-        self.shared_buffer = self.p_device.map(0, size) as *mut u8;
+        self.shared_buffer = self.p_device.as_ref().unwrap().borrow_mut().map(0, size) as *mut u8;
 
         if self.shared_buffer as usize == 0 {
             false
@@ -50,14 +47,14 @@ impl Enclave {
     }
 
     fn init_stack(&mut self, start: usize, size: usize, is_rt: bool) -> bool {
-        let nullpage = [0u8; PAGE_SIZE];
+        let mut nullpage = [0u8; PAGE_SIZE];
         let high_addr = round_up(start, PAGE_BITS);
         let mut va_start_stk = round_down(high_addr - size, PAGE_BITS);
         let stk_pages = (high_addr - va_start_stk) / PAGE_SIZE;
 
-        for i in 0..stk_pages {
-            if !self.p_memory.allocPage(
-                va_start_stk, &nullpage as *[u8],
+        for _ in 0..stk_pages {
+            if !self.p_memory.as_mut().unwrap().alloc_page(
+                va_start_stk, nullpage.as_mut_ptr(),
                 if is_rt { RT_NOEXEC } else { USER_NOEXEC }
             ) {
                 return false;
@@ -72,7 +69,7 @@ impl Enclave {
         let va_end = round_up(self.params.get_untrusted_end() as usize, PAGE_BITS);
 
         while va_start < va_end {
-            if !self.p_memory.alloc_page(va_start, 0 as *const u8, UTM_FULL) {
+            if !self.p_memory.as_mut().unwrap().alloc_page(va_start, 0 as *mut u8, UTM_FULL) {
                 return Error::PageAllocationFailure;
             }
             va_start += PAGE_SIZE;
@@ -80,22 +77,32 @@ impl Enclave {
         Error::Success
     }
 
-    fn map_elf(&mut self, elf: &ElfFile) -> bool {
+    fn map_elf(&mut self, eapp: bool) -> bool {
+        let elf = if eapp {
+            self.enclave_file.as_ref().unwrap()
+        } else {
+            self.runtime_file.as_ref().unwrap()
+        };
         let num_pages = round_down(elf.get_total_memory_size(), PAGE_BITS) / PAGE_SIZE;
         let va = elf.get_min_vaddr();
 
-        if self.p_memory.epm_alloc_vspace(va, num_pages) != num_pages {
-            panic!("failed to allocate vspace");
+        if self.p_memory.as_mut().unwrap().epm_alloc_vspace(va, num_pages) != num_pages {
+            println!("failed to allocate vspace");
             false
         } else {
             true
         }
     }
 
-    fn load_elf(&mut self, elf: &ElfFile) -> Error {
-        let null_page = [0u8; PAGE_SIZE];
+    fn load_elf(&mut self, eapp: bool) -> Error {
+        let elf = if eapp {
+            self.enclave_file.as_ref().unwrap()
+        } else {
+            self.runtime_file.as_ref().unwrap()
+        };
+        let mut null_page = [0u8; PAGE_SIZE];
         let mode = elf.get_page_mode();
-        for i in elf.get_num_program_headers() {
+        for i in 0..elf.get_num_program_headers() {
             if elf.get_program_header_type(i) != PT_LOAD {
                 continue
             }
@@ -110,33 +117,45 @@ impl Enclave {
                 let offset = va - page_down(va);
                 let length = page_up(va) - va;
                 let mut page = [0u8; PAGE_SIZE];
-                unsafe { libc::memcpy(page.as_mut_ptr().offset(offset as isize), src, length); }
-                if !self.p_memory.alloc_page(page_down(va), page.as_ptr(), mode) {
+                unsafe {
+                    libc::memcpy(
+                        page.as_mut_ptr().offset(offset as isize) as *mut libc::c_void,
+                        src as *mut libc::c_void,
+                        length
+                    );
+                }
+                if !self.p_memory.as_mut().unwrap().alloc_page(page_down(va), page.as_mut_ptr(), mode) {
                     return Error::PageAllocationFailure;
                 }
-                src += length;
+                unsafe { src = src.offset(length as isize); }
                 va += length;
             }
 
             while va + PAGE_SIZE <= file_end {
-                if !self.p_memory.alloc_page(va, src, mode) {
+                if !self.p_memory.as_mut().unwrap().alloc_page(va, src, mode) {
                     return Error::PageAllocationFailure;
                 }
-                src += PAGE_SIZE;
+                unsafe { src = src.offset(PAGE_SIZE as isize); }
                 va += PAGE_SIZE;
             }
 
             if va < file_end {
                 let mut page = [0u8; PAGE_SIZE];
-                unsafe { libc::memcpy(page.as_mut_ptr(), src, file_end - va); }
-                if !self.p_memory.alloc_page(va, page.as_ptr(), mode) {
+                unsafe {
+                    libc::memcpy(
+                        page.as_mut_ptr() as *mut libc::c_void,
+                        src as *mut libc::c_void,
+                        file_end - va
+                    );
+                }
+                if !self.p_memory.as_mut().unwrap().alloc_page(va, page.as_mut_ptr(), mode) {
                     return Error::PageAllocationFailure;
                 }
                 va += PAGE_SIZE;
             }
 
             while va < memory_end {
-                if !self.p_memory.alloc_page(va, null_page.as_ptr(), mode) {
+                if !self.p_memory.as_mut().unwrap().alloc_page(va, null_page.as_mut_ptr(), mode) {
                     return Error::PageAllocationFailure;
                 }
                 va += PAGE_SIZE;
@@ -155,10 +174,10 @@ impl Enclave {
         let mut runtime_max_seen = 0;
         let mut user_max_seen = 0;
 
-        if self.p_memory.validate_and_hash_epm(
+        if self.p_memory.as_ref().unwrap().validate_and_hash_epm(
             &mut hash_ctx,
             ptlevel as isize,
-            self.p_memory.get_root_page_table(),
+            self.p_memory.as_ref().unwrap().get_root_page_table(),
             0,
             0,
             &mut runtime_max_seen,
@@ -188,7 +207,7 @@ impl Enclave {
             panic!("Invalid enclave ELF");
         }
 
-        if !runtime_path.initialize(true) {
+        if !runtime_file.initialize(true) {
             self.destroy();
             panic!("Invalid runtime ELF");
         }
@@ -198,7 +217,7 @@ impl Enclave {
             panic!("enclave file is not valid");
         }
 
-        if !runtime_path.is_valid() {
+        if !runtime_file.is_valid() {
             self.destroy();
             panic!("runtime file is not valid");
         }
@@ -210,25 +229,25 @@ impl Enclave {
     }
 
     fn prepare_enclave(&mut self, alternate_phys_addr: usize) -> bool {
-        let mut min_pages = round_up(self.params.get_free_mem_size() as usize, PAGE_BITS) / PAGE_SIZE
+        let min_pages = round_up(self.params.get_free_mem_size() as usize, PAGE_BITS) / PAGE_SIZE
             + calculate_required_pages(self.enclave_file.as_ref().unwrap().get_total_memory_size(), self.runtime_file.as_ref().unwrap().get_total_memory_size());
 
         if self.params.is_simulated() {
-            self.p_memory.init(0 as *mut dyn KeystoneDevice, 0, min_pages);
+            self.p_memory.as_mut().unwrap().init(self.p_device.as_mut().unwrap().clone(), 0, min_pages);
             return true;
         }
 
-        if self.p_device.create(min_pages as u64) != Error::Success {
+        if self.p_device.as_ref().unwrap().borrow_mut().create(min_pages as u64) != Error::Success {
             return false;
         }
 
         let phys_addr = if alternate_phys_addr != 0 {
             alternate_phys_addr
         } else {
-            self.p_device.get_phys_addr()
+            self.p_device.as_ref().unwrap().borrow().get_phys_addr()
         };
 
-        self.p_memory.init(self.p_device, phys_addr, min_pages);
+        self.p_memory.as_mut().unwrap().init(self.p_device.as_ref().unwrap().clone(), phys_addr, min_pages);
         true
     }
 
@@ -237,8 +256,8 @@ impl Enclave {
             params: Params::new(),
             runtime_file: None,
             enclave_file: None,
-            p_memory: 0 as *mut dyn Memory,
-            p_device: 0 as *mut dyn KeystoneDevice,
+            p_memory: None,
+            p_device: None,
             hash: [0u8; MDSIZE],
             hash_ctx: None,
             runtime_stk_sz: 0,
@@ -267,18 +286,18 @@ impl Enclave {
 
     pub fn init(&mut self, eapp_path: &str, runtime_path: &str, params: Params, alternate_phys_addr: usize) -> Error {
         if self.params.is_simulated() {
-            self.p_memory = &SimulatedEnclaveMemory::new() as *mut SimulatedEnclaveMemory;
-            self.p_device = &MockKeystoneDevice::new() as *mut MockKeystoneDevice;
+            self.p_memory = Some(Box::new(SimulatedEnclaveMemory::new()));
+            self.p_device = Some(Rc::new(RefCell::new(MockKeystoneDevice::new())));
         } else {
-            self.p_memory = &PhysicalEnclaveMemory::new() as *mut PhysicalEnclaveMemory;
-            self.p_device = &PhysicalKeystoneDevice::new() as *mut PhysicalKeystoneDevice;
+            self.p_memory = Some(Box::new(PhysicalEnclaveMemory::new()));
+            self.p_device = Some(Rc::new(RefCell::new(PhysicalKeystoneDevice::new())));
         }
 
         if !self.init_files(eapp_path, runtime_path) {
             return Error::FileInitFailure;
         }
 
-        if !self.p_device.init_device(&params) {
+        if !self.p_device.as_ref().unwrap().borrow_mut().init_device(&params) {
             self.destroy();
             return Error::DeviceInitFailure;
         }
@@ -288,27 +307,27 @@ impl Enclave {
             return Error::DeviceError;
         }
 
-        if !self.map_elf(self.runtime_file.as_ref().unwrap()) {
+        if !self.map_elf(false) {
             self.destroy();
             return Error::VSpaceAllocationFailure;
         }
 
-        self.p_memory.start_runtime_mem();
+        self.p_memory.as_mut().unwrap().start_runtime_mem();
 
-        if self.load_elf(self.runtime_file.as_ref().unwrap()) != Error::Success {
+        if self.load_elf(false) != Error::Success {
             println!("failed to load runtime ELF");
             self.destroy();
             return Error::ELFLoadFailure;
         }
 
-        if !self.map_elf(self.enclave_file.as_ref().unwrap()) {
+        if !self.map_elf(true) {
             self.destroy();
             return Error::VSpaceAllocationFailure;
         }
 
-        self.p_memory.start_eapp_mem();
+        self.p_memory.as_mut().unwrap().start_eapp_mem();
 
-        if self.load_elf(self.enclave_file.as_ref().unwrap()) != Error::Success {
+        if self.load_elf(true) != Error::Success {
             println!("failed to load enclave ELF");
             self.destroy();
             return Error::ELFLoadFailure;
@@ -321,7 +340,7 @@ impl Enclave {
             return Error::PageAllocationFailure;
         }
 
-        if !self.p_memory.alloc_utm(params.get_untrusted_size() as usize) {
+        if self.p_memory.as_mut().unwrap().alloc_utm(params.get_untrusted_size() as usize) == 0 {
             println!("failed to init untrusted memory - ioctl() failed");
             self.destroy();
             return Error::DeviceError;
@@ -338,16 +357,17 @@ impl Enclave {
             untrusted_size: params.get_untrusted_size() as usize,
         };
 
-        self.p_memory.start_free_mem();
+        self.p_memory.as_mut().unwrap().start_free_mem();
 
         if params.is_simulated() {
             self.validate_and_hash_enclave(&runtime_params);
         }
 
-        if self.p_device.finalize(
-            self.p_memory.get_runtime_phys_addr(),
-            self.p_memory.get_eapp_phys_addr(),
-            self.p_memory.get_free_phys_addr()
+        if self.p_device.as_ref().unwrap().borrow_mut().finalize(
+            self.p_memory.as_ref().unwrap().get_runtime_phys_addr(),
+            self.p_memory.as_ref().unwrap().get_eapp_phys_addr(),
+            self.p_memory.as_ref().unwrap().get_free_phys_addr(),
+            runtime_params
         ) != Error::Success {
             self.destroy();
             return Error::DeviceError;
@@ -368,22 +388,22 @@ impl Enclave {
     pub fn destroy(&mut self) -> Error {
         self.runtime_file.take();
         self.enclave_file.take();
-        self.p_device.destroy()
+        self.p_device.take().unwrap().borrow_mut().destroy()
     }
 
     pub fn run(&mut self, ret: &mut usize) -> Error {
         if self.params.is_simulated() {
             Error::Success
         } else {
-            let mut err = self.p_device.run(ret);
+            let mut err = self.p_device.as_ref().unwrap().borrow_mut().run(ret);
             while err == Error::EdgeCallHost || err == Error::EnclaveInterrupted {
                 if err == Error::EdgeCallHost && self.o_func_dispatch.is_some() {
                     self.o_func_dispatch.unwrap()(self.get_shared_buffer());
                 }
-                err = self.p_device.resume(ret);
+                err = self.p_device.as_ref().unwrap().borrow_mut().resume(ret);
             }
 
-            if ret != Error::Success {
+            if *ret != Error::Success as usize {
                 println!("failed to run enclave - ioctl() failed");
                 self.destroy();
                 Error::DeviceError

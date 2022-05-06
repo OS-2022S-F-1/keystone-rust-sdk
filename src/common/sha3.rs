@@ -61,7 +61,7 @@ impl SHA3 {
     fn sha3_keccakf(&mut self) {
         let mut q = self.st.q;
 
-        let mut t: u64 = 0;
+        let mut t: u64;
         let mut bc: [u64; 5] = [0; 5];
 
         #[cfg(feature = "big_endian")]

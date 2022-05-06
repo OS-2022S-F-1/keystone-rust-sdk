@@ -1,4 +1,4 @@
-use core::mem::sizeof;
+use core::mem::size_of;
 use super::ioctl::_IOR;
 
 pub const KEYSTONE_IOC_MAGIC: usize = 0xa4;
@@ -75,9 +75,9 @@ impl KeystoneIoctlRunEnclave {
     }
 }
 
-pub const KEYSTONE_IOC_CREATE_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x00, sizeof::<KeystoneIoctlCreateEnclave>());
-pub const KEYSTONE_IOC_DESTROY_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x01, sizeof::<KeystoneIoctlCreateEnclave>());
-pub const KEYSTONE_IOC_RUN_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x04, sizeof::<KeystoneIoctlRunEnclave>());
-pub const KEYSTONE_IOC_RESUME_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x05, sizeof::<KeystoneIoctlRunEnclave>());
-pub const KEYSTONE_IOC_FINALIZE_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x06, sizeof::<KeystoneIoctlCreateEnclave>());
-pub const KEYSTONE_IOC_UTM_INIT: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x07, sizeof::<KeystoneIoctlCreateEnclave>());
+pub const KEYSTONE_IOC_CREATE_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x00, size_of::<KeystoneIoctlCreateEnclave>());
+pub const KEYSTONE_IOC_DESTROY_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x01, size_of::<KeystoneIoctlCreateEnclave>());
+pub const KEYSTONE_IOC_RUN_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x04, size_of::<KeystoneIoctlRunEnclave>());
+pub const KEYSTONE_IOC_RESUME_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x05, size_of::<KeystoneIoctlRunEnclave>());
+pub const KEYSTONE_IOC_FINALIZE_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x06, size_of::<KeystoneIoctlCreateEnclave>());
+pub const KEYSTONE_IOC_UTM_INIT: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x07, size_of::<KeystoneIoctlCreateEnclave>());
