@@ -2,6 +2,7 @@ use libc;
 use std::{mem::size_of, rc::Rc, cell::RefCell};
 use elf::{ElfFile, PT_LOAD};
 use crate::common::sha3::MDSIZE;
+use crate::edge::EdgeCallHandler;
 use super::common::{
     RT_NOEXEC, USER_NOEXEC, UTM_FULL, PAGE_BITS, PAGE_SIZE,
     round_up, round_down, page_down, page_up, is_aligned
@@ -14,8 +15,6 @@ use super::memory::{HashContext, RISCV_PGLEVEL_TOP, Memory};
 use super::physical_enclave_memory::PhysicalEnclaveMemory;
 use super::simulated_enclave_memory::SimulatedEnclaveMemory;
 
-pub type OCallFunc = fn(_: *mut u8) -> ();
-
 pub struct Enclave {
     params: Params,
     runtime_file: Option<ElfFile>,
@@ -27,7 +26,7 @@ pub struct Enclave {
     runtime_stk_sz: usize,
     shared_buffer: *mut u8,
     shared_buffer_size: usize,
-    o_func_dispatch: Option<OCallFunc>,
+    ocall_handler: Option<EdgeCallHandler>,
 }
 
 impl Enclave {
@@ -263,7 +262,7 @@ impl Enclave {
             runtime_stk_sz: 0,
             shared_buffer: 0 as *mut u8,
             shared_buffer_size: 0,
-            o_func_dispatch: None,
+            ocall_handler: None,
         }
     }
 
@@ -271,7 +270,7 @@ impl Enclave {
         &self.hash_ctx
     }
 
-    pub fn get_shared_buffer(&mut self) -> *mut u8 {
+    pub fn get_shared_buffer(&self) -> *mut u8 {
         self.shared_buffer
     }
 
@@ -279,8 +278,8 @@ impl Enclave {
         self.shared_buffer_size
     }
 
-    pub fn register_ocall_dispatch(&mut self, func: OCallFunc) -> Error {
-        self.o_func_dispatch = Some(func);
+    pub fn register_ocall_handler(&mut self, handler: EdgeCallHandler) -> Error {
+        self.ocall_handler = Some(handler);
         Error::Success
     }
 
@@ -397,8 +396,8 @@ impl Enclave {
         } else {
             let mut err = self.p_device.as_ref().unwrap().borrow_mut().run(ret);
             while err == Error::EdgeCallHost || err == Error::EnclaveInterrupted {
-                if err == Error::EdgeCallHost && self.o_func_dispatch.is_some() {
-                    self.o_func_dispatch.unwrap()(self.get_shared_buffer());
+                if err == Error::EdgeCallHost && self.ocall_handler.is_some() {
+                    self.ocall_handler.as_ref().unwrap().incoming_call_dispatch(self.get_shared_buffer());
                 }
                 err = self.p_device.as_ref().unwrap().borrow_mut().resume(ret);
             }
