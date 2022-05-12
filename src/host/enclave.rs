@@ -1,5 +1,7 @@
-use std::{fs, rc::Rc};
+extern crate alloc;
+use std::fs;
 use core::{mem::size_of, cell::RefCell, ptr};
+use alloc::rc::Rc;
 use xmas_elf::{ElfFile, program::Type};
 use crate::common::sha3::MDSIZE;
 use crate::edge::EdgeCallHandler;
