@@ -9,7 +9,6 @@ pub const STDOUT: usize = 1;
 
 const CONSOLE_BUFFER_SIZE: usize = 256 * 10;
 
-use super::{read, write};
 use lazy_static::*;
 
 struct ConsoleBuffer(VecDeque<u8>);

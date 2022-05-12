@@ -1,5 +1,6 @@
 use core::mem::zeroed;
-use alloc::boxed::vec::{self, Vec};
+use alloc::vec;
+use alloc::vec::Vec;
 use super::stat::Stat;
 use super::syscall::{sys_openat, sys_fstat, sys_read, sys_close};
 
