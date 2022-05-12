@@ -114,8 +114,8 @@ impl Memory for SimulatedEnclaveMemory {
         src as usize
     }
 
-    fn write_mem(&mut self, src: *mut u8, dst: *mut u8, size: usize) {
-        unsafe { ptr::copy_nonoverlapping(dst as *mut u8, src as *mut u8, size); }
+    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize) {
+        unsafe { ptr::copy_nonoverlapping(src, dst, size); }
     }
 
     fn alloc_mem(&mut self, size: usize) -> usize {
@@ -129,7 +129,7 @@ impl Memory for SimulatedEnclaveMemory {
         self.utm_free_list
     }
 
-    fn alloc_page(&mut self, va: usize, src: *mut u8, mode: usize) -> bool {
+    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
         let pte = self.__ept_walk_create(va) as *mut usize;
         let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
 

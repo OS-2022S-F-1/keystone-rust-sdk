@@ -8,6 +8,7 @@ mod keystone_device;
 mod memory;
 mod physical_enclave_memory;
 mod simulated_enclave_memory;
+mod elf;
 mod enclave;
 
 pub use error::Error;
