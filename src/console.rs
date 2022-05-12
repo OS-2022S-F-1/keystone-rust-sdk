@@ -2,6 +2,7 @@ use alloc::collections::vec_deque::VecDeque;
 use alloc::sync::Arc;
 use core::fmt::{self, Write};
 use spin::mutex::Mutex;
+use crate::common::syscall::{sys_write, sys_read};
 
 pub const STDIN: usize = 0;
 pub const STDOUT: usize = 1;
@@ -23,7 +24,7 @@ lazy_static! {
 impl ConsoleBuffer {
     fn flush(&mut self) -> isize {
         let s: &[u8] = self.0.make_contiguous();
-        let ret = write(STDOUT, s);
+        let ret = sys_write(STDOUT, s.as_ptr(), s.len());
         self.0.clear();
         ret
     }
@@ -65,7 +66,7 @@ macro_rules! println {
 
 pub fn getchar() -> u8 {
     let mut c = [0u8; 1];
-    read(STDIN, &mut c);
+    sys_read(STDIN, c.as_mut_ptr(), c.len());
     c[0]
 }
 
