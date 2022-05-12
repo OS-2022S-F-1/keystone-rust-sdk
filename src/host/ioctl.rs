@@ -1,5 +1,3 @@
-pub const SYS_IOCTL: usize = 29;
-
 pub const _IOC_NRBITS: usize = 8;
 pub const _IOC_TYPEBITS: usize = 8;
 pub const _IOC_SIZEBITS: usize = 14;

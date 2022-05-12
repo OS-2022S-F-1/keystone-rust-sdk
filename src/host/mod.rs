@@ -3,7 +3,6 @@ mod error;
 mod params;
 mod ioctl;
 mod keystone_user;
-mod syscall;
 mod keystone_device;
 mod memory;
 mod physical_enclave_memory;

@@ -1,5 +1,5 @@
-use core::{ptr, mem::size_of};
-use std::{alloc, rc::Rc, cell::RefCell};
+use core::{ptr, mem::size_of, cell::RefCell};
+use alloc::rc::Rc;
 use super::common::{RT_NOEXEC, USER_NOEXEC, RT_FULL, USER_FULL, UTM_FULL, PAGE_BITS, PAGE_SIZE};
 use super::keystone_device::KeystoneDevice;
 use super::memory::{
@@ -79,7 +79,7 @@ impl SimulatedEnclaveMemory {
 
     fn allocate_aligned(size: usize, alignment: usize) -> usize {
         let mask = alignment - 1;
-        let mem = unsafe { alloc::alloc(alloc::Layout::from_size_align(size, alignment).unwrap()) };
+        let mem = unsafe { alloc::alloc::alloc(alloc::alloc::Layout::from_size_align(size, alignment).unwrap()) };
         (mem as usize + mask) & !mask
     }
 }

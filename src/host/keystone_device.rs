@@ -1,3 +1,5 @@
+use alloc::boxed::vec::{self, Vec};
+use crate::common::syscall::{ioctl, mmap, PROT_READ, PROT_WRITE, MAP_SHARED};
 use super::common::{KEYSTONE_ENCLAVE_EDGE_CALL_HOST, KEYSTONE_ENCLAVE_INTERRUPTED, KEYSTONE_ENCLAVE_DONE};
 use super::error::Error;
 use super::params::Params;
@@ -6,7 +8,6 @@ use super::keystone_user::{
     KEYSTONE_IOC_CREATE_ENCLAVE, KEYSTONE_IOC_DESTROY_ENCLAVE, KEYSTONE_IOC_RUN_ENCLAVE,
     KEYSTONE_IOC_RESUME_ENCLAVE, KEYSTONE_IOC_FINALIZE_ENCLAVE, KEYSTONE_IOC_UTM_INIT,
 };
-use super::syscall::{ioctl, mmap, PROT_READ, PROT_WRITE, MAP_SHARED};
 
 pub trait KeystoneDevice: Drop {
     fn new() -> Self where Self: Sized;

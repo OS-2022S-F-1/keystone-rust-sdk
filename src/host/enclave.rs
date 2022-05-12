@@ -1,9 +1,7 @@
-extern crate alloc;
-use std::fs;
 use core::{mem::size_of, cell::RefCell, ptr};
-use alloc::rc::Rc;
+use alloc::{rc::Rc, boxed::{Box, vec::Vec}};
 use xmas_elf::{ElfFile, program::Type};
-use crate::common::sha3::MDSIZE;
+use crate::common::{sha3::MDSIZE, fs::read};
 use crate::edge::EdgeCallHandler;
 use crate::host::elf::KeystoneElfFile;
 use super::common::{
@@ -26,8 +24,8 @@ pub struct ElfData {
 impl ElfData {
     pub fn new(eapp_path: &str, runtime_path: &str) -> Self {
         Self {
-            runtime_raw: fs::read(runtime_path).expect("read eapp file err"),
-            enclave_raw: fs::read(eapp_path).expect("read runtime file err")
+            runtime_raw: read(runtime_path),
+            enclave_raw: read(eapp_path)
         }
     }
 }

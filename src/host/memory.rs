@@ -1,4 +1,5 @@
-use std::{rc::Rc, cell::RefCell};
+use alloc::rc::Rc;
+use core::cell::RefCell;
 use crate::common::sha3;
 use super::keystone_device::KeystoneDevice;
 
