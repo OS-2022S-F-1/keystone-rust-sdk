@@ -1,4 +1,5 @@
-use std::{rc::Rc, cell::RefCell};
+use alloc::rc::Rc;
+use core::cell::RefCell;
 use crate::common::sha3;
 use super::keystone_device::KeystoneDevice;
 
@@ -31,10 +32,10 @@ pub trait Memory: Drop {
     fn new() -> Self where Self: Sized;
     fn init(&mut self, dev: Rc<RefCell<dyn KeystoneDevice>>, phys_addr: usize, min_pages: usize);
     fn read_mem(&mut self, src: *const u8, size: usize) -> usize;
-    fn write_mem(&mut self, src: *mut u8, dst: *mut u8, size: usize);
+    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize);
     fn alloc_mem(&mut self, size: usize) -> usize;
     fn alloc_utm(&mut self, size: usize) -> usize;
-    fn alloc_page(&mut self, va: usize, src: *mut u8, mode: usize) -> bool;
+    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool;
     fn epm_alloc_vspace(&mut self, addr: usize, num_pages: usize) -> usize;
     fn get_start_addr(&self) -> usize;
     fn get_current_epm_address(&self) -> usize;

@@ -10,5 +10,5 @@ big_endian = []
 riscv_32 = []
 
 [dependencies]
-libc = "0.2.125"
-elf = { git = "https://github.com/OS-2022S-F-1/riscv-elf.git", rev = "2df5bd6" }
+xmas-elf = "0.8.0"
+bitflags = "1.3"

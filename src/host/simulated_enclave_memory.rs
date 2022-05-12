@@ -1,5 +1,5 @@
-use core::{ptr, mem::size_of};
-use std::{alloc, rc::Rc, cell::RefCell};
+use core::{ptr, mem::size_of, cell::RefCell};
+use alloc::rc::Rc;
 use super::common::{RT_NOEXEC, USER_NOEXEC, RT_FULL, USER_FULL, UTM_FULL, PAGE_BITS, PAGE_SIZE};
 use super::keystone_device::KeystoneDevice;
 use super::memory::{
@@ -79,7 +79,7 @@ impl SimulatedEnclaveMemory {
 
     fn allocate_aligned(size: usize, alignment: usize) -> usize {
         let mask = alignment - 1;
-        let mem = unsafe { alloc::alloc(alloc::Layout::from_size_align(size, alignment).unwrap()) };
+        let mem = unsafe { alloc::alloc::alloc(alloc::alloc::Layout::from_size_align(size, alignment).unwrap()) };
         (mem as usize + mask) & !mask
     }
 }
@@ -114,8 +114,8 @@ impl Memory for SimulatedEnclaveMemory {
         src as usize
     }
 
-    fn write_mem(&mut self, src: *mut u8, dst: *mut u8, size: usize) {
-        unsafe { ptr::copy_nonoverlapping(dst as *mut u8, src as *mut u8, size); }
+    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize) {
+        unsafe { ptr::copy_nonoverlapping(src, dst, size); }
     }
 
     fn alloc_mem(&mut self, size: usize) -> usize {
@@ -129,7 +129,7 @@ impl Memory for SimulatedEnclaveMemory {
         self.utm_free_list
     }
 
-    fn alloc_page(&mut self, va: usize, src: *mut u8, mode: usize) -> bool {
+    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
         let pte = self.__ept_walk_create(va) as *mut usize;
         let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
 

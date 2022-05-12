@@ -1,5 +1,5 @@
-use core::{ptr, mem::size_of};
-use std::{rc::Rc, cell::RefCell};
+use core::{ptr, mem::size_of, cell::RefCell};
+use alloc::rc::Rc;
 use super::common::{RT_NOEXEC, USER_NOEXEC, RT_FULL, USER_FULL, UTM_FULL, PAGE_BITS, PAGE_SIZE};
 use super::keystone_device::KeystoneDevice;
 use super::memory::{
@@ -113,10 +113,10 @@ impl Memory for PhysicalEnclaveMemory {
         self.p_device.as_ref().unwrap().borrow_mut().map(unsafe { src.offset(-(self.start_addr as isize)) as usize }, size) as usize
     }
 
-    fn write_mem(&mut self, src: *mut u8, dst: *mut u8, size: usize) {
+    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize) {
         assert!(self.p_device.is_some());
         let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(unsafe { dst.offset(-(self.start_addr as isize)) as usize }, size);
-        unsafe { ptr::copy_nonoverlapping(va_dst as *mut u8, src as *mut u8, size); }
+        unsafe { ptr::copy_nonoverlapping(src, va_dst as *mut u8, size); }
     }
 
     fn alloc_mem(&mut self, _size: usize) -> usize {
@@ -133,7 +133,7 @@ impl Memory for PhysicalEnclaveMemory {
         ret
     }
 
-    fn alloc_page(&mut self, va: usize, src: *mut u8, mode: usize) -> bool {
+    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
         let pte = self.__ept_walk_create(va) as *mut usize;
         let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
 
