@@ -12,4 +12,4 @@ mod enclave;
 
 pub use error::Error;
 pub use params::Params;
-pub use enclave::Enclave;
+pub use enclave::{Enclave, ElfData};

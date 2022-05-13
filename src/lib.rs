@@ -9,5 +9,5 @@ mod host;
 pub mod console;
 
 pub use edge::EdgeCallHandler;
-pub use host::{Error, Params, Enclave};
+pub use host::{Error, Params, Enclave, ElfData};
 pub use console::{flush, STDIN, STDOUT};
