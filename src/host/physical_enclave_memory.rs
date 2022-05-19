@@ -50,8 +50,8 @@ impl PhysicalEnclaveMemory {
     }
 
     #[inline]
-    fn pt_idx(addr: usize, level: isize) -> usize {
-        (addr >> (RISCV_PGLEVEL_BITS * level as usize + RISCV_PGSHIFT)) & ((1 << RISCV_PGLEVEL_BITS) - 1)
+    fn pt_idx(addr: usize, level: usize) -> usize {
+        (addr >> (RISCV_PGLEVEL_BITS * level + RISCV_PGSHIFT)) & ((1 << RISCV_PGLEVEL_BITS) - 1)
     }
 
     fn __ept_continue_walk_create(&mut self, addr: usize, pte: *mut usize) -> usize {
@@ -63,19 +63,19 @@ impl PhysicalEnclaveMemory {
 
     unsafe fn __ept_walk_internal(&mut self, addr: usize, create: isize) -> usize {
         let mut t = self.root_page_table as *const usize;
-        for i in (0..(VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS).rev() {
-            let idx = Self::pt_idx(addr, i as isize);
+        for i in (1..(VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS).rev() {
+            let idx = Self::pt_idx(addr, i);
             if *t.offset(idx as isize) & PTE_V == 0 {
                 return if create != 0 {
                     self.__ept_continue_walk_create(addr, t.offset(idx as isize) as *mut usize)
                 } else {
                     0
-                }
+                };
             }
 
             t = self.read_mem(Self::pte_ppn((*t.offset(idx as isize)) << RISCV_PGSHIFT) as *const u8, PAGE_SIZE) as *const usize;
         }
-        *t.offset(Self::pt_idx(addr, 0) as isize)
+        t.offset(Self::pt_idx(addr, 0) as isize) as usize
     }
 
     fn __ept_walk_create(&mut self, addr: usize) -> usize {

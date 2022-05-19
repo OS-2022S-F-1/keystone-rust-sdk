@@ -241,7 +241,7 @@ impl<'a> Enclave<'a> {
         let enclave_file = ElfFile::new(data.enclave_raw.as_slice()).expect("load eapp err");
         let runtime_file = ElfFile::new(data.runtime_raw.as_slice()).expect("load runtime err");
 
-        if p_device.borrow_mut().init_device(&params) {
+        if !p_device.borrow_mut().init_device(&params) {
             p_device.borrow_mut().destroy();
             return Err(Error::DeviceInitFailure);
         }

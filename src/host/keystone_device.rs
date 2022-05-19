@@ -94,12 +94,13 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         let mut encl = KeystoneIoctlCreateEnclave::new();
         encl.min_pages = min_pages as usize;
 
-        if ioctl(
+        let res = ioctl(
             self.fd as usize,
             KEYSTONE_IOC_CREATE_ENCLAVE,
             &mut encl as *mut KeystoneIoctlCreateEnclave as *mut u8
-        ) != 0 {
-            println!("ioctl error");
+        );
+        if res != 0 {
+            println!("ioctl error {}", res);
             self.eid = -1;
             Error::IoctlErrorCreate
         } else {
@@ -174,7 +175,8 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
     }
 
     fn map(&mut self, addr: usize, size: usize) -> isize {
-        let ret = mmap(0, (size & (!(1 << 48))) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
+        // let ret = mmap(0, (size & (!(1 << 48))) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
+        let ret = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
         assert_ne!(ret, -1);
         ret
     }

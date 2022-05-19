@@ -10,7 +10,7 @@ pub fn read(path: &str) -> Vec<u8> {
         path.as_ptr(),
         /* O_RDONLY */ 0, 0
     ) as usize;
-    let mut stat = unsafe { zeroed::<Stat>() };//sys_fstat(fd);
+    let mut stat = unsafe { zeroed::<Stat>() };
     sys_fstat(fd, &mut stat);
     let mut ret = vec![0u8; stat.size as usize];
     sys_read(fd, ret.as_mut_ptr(), stat.size as usize);

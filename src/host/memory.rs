@@ -18,7 +18,7 @@ pub const PTE_SOFT: usize = 0x300;
 pub const PTE_PPN_SHIFT: usize = 10;
 
 pub const VA_BITS: usize = if cfg!(feature = "riscv_32") { 32 } else { 39 };
-pub const RISCV_PGLEVEL_BITS: usize = if cfg!(feature = "riscv_32") { 9 } else { 10 };
+pub const RISCV_PGLEVEL_BITS: usize = if cfg!(feature = "riscv_32") { 10 } else { 9 };
 
 pub const RISCV_PGSHIFT: usize = 12;
 pub const RISCV_PGSIZE: usize = 1 << RISCV_PGSHIFT;

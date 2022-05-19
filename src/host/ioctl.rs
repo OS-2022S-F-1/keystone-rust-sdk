@@ -11,7 +11,7 @@ pub const _IOC_DIRMASK: usize = (1 << _IOC_DIRBITS) - 1;
 pub const _IOC_NRSHIFT: usize = 0;
 pub const _IOC_TYPESHIFT: usize = _IOC_NRSHIFT + _IOC_NRBITS;
 pub const _IOC_SIZESHIFT: usize = _IOC_TYPESHIFT + _IOC_TYPEBITS;
-pub const _IOC_DIRSHIFT: usize = 0;
+pub const _IOC_DIRSHIFT: usize = _IOC_SIZESHIFT + _IOC_SIZEBITS;
 
 pub const _IOC_NONE: usize = 0;
 pub const _IOC_WRITE: usize = 1;

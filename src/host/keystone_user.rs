@@ -1,5 +1,5 @@
 use core::mem::size_of;
-use super::ioctl::_IOR;
+use super::ioctl::{_IOR, _IOW};
 
 pub const KEYSTONE_IOC_MAGIC: usize = 0xa4;
 
@@ -76,7 +76,7 @@ impl KeystoneIoctlRunEnclave {
 }
 
 pub const KEYSTONE_IOC_CREATE_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x00, size_of::<KeystoneIoctlCreateEnclave>());
-pub const KEYSTONE_IOC_DESTROY_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x01, size_of::<KeystoneIoctlCreateEnclave>());
+pub const KEYSTONE_IOC_DESTROY_ENCLAVE: usize = _IOW(KEYSTONE_IOC_MAGIC, 0x01, size_of::<KeystoneIoctlCreateEnclave>());
 pub const KEYSTONE_IOC_RUN_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x04, size_of::<KeystoneIoctlRunEnclave>());
 pub const KEYSTONE_IOC_RESUME_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x05, size_of::<KeystoneIoctlRunEnclave>());
 pub const KEYSTONE_IOC_FINALIZE_ENCLAVE: usize = _IOR(KEYSTONE_IOC_MAGIC, 0x06, size_of::<KeystoneIoctlCreateEnclave>());
