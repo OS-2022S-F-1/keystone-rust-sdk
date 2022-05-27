@@ -166,11 +166,12 @@ impl Memory for SimulatedEnclaveMemory {
         true
     }
 
-    fn epm_alloc_vspace(&mut self, addr: usize, num_pages: usize) -> usize {
+    fn epm_alloc_vspace(&mut self, mut addr: usize, num_pages: usize) -> usize {
         for count in 0..num_pages {
             if self.__ept_walk_create(addr) == 0 {
                 return count;
             }
+            addr += PAGE_SIZE;
         }
         num_pages
     }

@@ -65,15 +65,17 @@ impl PhysicalEnclaveMemory {
         let mut t = self.root_page_table as *const usize;
         for i in (1..(VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS).rev() {
             let idx = Self::pt_idx(addr, i);
-            if *t.offset(idx as isize) & PTE_V == 0 {
+            let ptr = t.offset(idx as isize);
+            if *ptr & PTE_V == 0 {
                 return if create != 0 {
-                    self.__ept_continue_walk_create(addr, t.offset(idx as isize) as *mut usize)
+                    // self.__ept_continue_walk_create(addr, t.offset(idx as isize) as *mut usize)
+                    self.__ept_continue_walk_create(addr, ptr as *mut usize)
                 } else {
                     0
                 };
             }
 
-            t = self.read_mem(Self::pte_ppn((*t.offset(idx as isize)) << RISCV_PGSHIFT) as *const u8, PAGE_SIZE) as *const usize;
+            t = self.read_mem((Self::pte_ppn(*ptr) << RISCV_PGSHIFT) as *const u8, PAGE_SIZE) as *const usize;
         }
         t.offset(Self::pt_idx(addr, 0) as isize) as usize
     }
@@ -105,13 +107,18 @@ impl Memory for PhysicalEnclaveMemory {
         self.p_device = Some(dev);
         self.epm_size = PAGE_SIZE * min_pages;
         self.root_page_table = self.alloc_mem(PAGE_SIZE);
+        for i in 0..PAGE_SIZE {
+            unsafe {
+                *(self.root_page_table as *mut u8).offset(i as isize) = 0u8;
+            }
+        }
         self.epm_free_list = phys_addr + PAGE_SIZE;
         self.start_addr = phys_addr;
     }
 
     fn read_mem(&mut self, src: *const u8, size: usize) -> usize {
         assert!(self.p_device.is_some());
-        self.p_device.as_ref().unwrap().borrow_mut().map(unsafe { src.offset(-(self.start_addr as isize)) as usize }, size) as usize
+        self.p_device.as_ref().unwrap().borrow_mut().map(src as usize - self.start_addr, size) as usize
     }
 
     fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize) {
@@ -170,11 +177,12 @@ impl Memory for PhysicalEnclaveMemory {
         true
     }
 
-    fn epm_alloc_vspace(&mut self, addr: usize, num_pages: usize) -> usize {
+    fn epm_alloc_vspace(&mut self, mut addr: usize, num_pages: usize) -> usize {
         for count in 0..num_pages {
             if self.__ept_walk_create(addr) == 0 {
                 return count;
             }
+            addr += PAGE_SIZE;
         }
         num_pages
     }
