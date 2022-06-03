@@ -18,52 +18,16 @@ pub const _IOC_WRITE: usize = 1;
 pub const _IOC_READ: usize = 2;
 
 #[inline]
-pub const fn _IOC(dir: usize, _type: usize, nr: usize, size: usize) -> usize {
+pub const fn _ioc(dir: usize, _type: usize, nr: usize, size: usize) -> usize {
     (dir << _IOC_DIRSHIFT) | (_type << _IOC_TYPESHIFT) | (nr << _IOC_NRSHIFT) | (size << _IOC_SIZESHIFT)
 }
 
 #[inline]
-pub const fn _IO(_type: usize, nr: usize) -> usize {
-    _IOC(_IOC_NONE, _type, nr, 0)
+pub const fn _ior(_type: usize, nr: usize, size: usize) -> usize {
+    _ioc(_IOC_READ, _type, nr, size)
 }
 
 #[inline]
-pub const fn _IOR(_type: usize, nr: usize, size: usize) -> usize {
-    _IOC(_IOC_READ, _type, nr, size)
+pub const fn _iow(_type: usize, nr: usize, size: usize) -> usize {
+    _ioc(_IOC_WRITE, _type, nr, size)
 }
-
-#[inline]
-pub const fn _IOW(_type: usize, nr: usize, size: usize) -> usize {
-    _IOC(_IOC_WRITE, _type, nr, size)
-}
-
-#[inline]
-pub const fn _IOWR(_type: usize, nr: usize, size: usize) -> usize {
-    _IOC(_IOC_READ | _IOC_WRITE, _type, nr, size)
-}
-
-#[inline]
-pub const fn _IOC_DIR(nr: usize) -> usize {
-    (nr >> _IOC_DIRSHIFT) & _IOC_DIRMASK
-}
-
-#[inline]
-pub const fn _IOC_TYPE(nr: usize) -> usize {
-    (nr >> _IOC_TYPESHIFT) & _IOC_TYPEMASK
-}
-
-#[inline]
-pub const fn _IOC_NR(nr: usize) -> usize {
-    (nr >> _IOC_NRSHIFT) & _IOC_NRMASK
-}
-
-#[inline]
-pub const fn _IOC_SIZE(nr: usize) -> usize {
-    (nr >> _IOC_SIZESHIFT) & _IOC_SIZEMASK
-}
-
-pub const IOC_IN: usize = _IOC_WRITE << _IOC_DIRSHIFT;
-pub const IOC_OUT: usize = _IOC_READ << _IOC_DIRSHIFT;
-pub const IOC_INOUT: usize = (_IOC_WRITE | _IOC_READ) << _IOC_DIRSHIFT;
-pub const IOCSIZE_MASK: usize = _IOC_SIZEMASK << _IOC_SIZESHIFT;
-pub const IOCSIZE_SHIFT: usize = _IOC_SIZESHIFT;
