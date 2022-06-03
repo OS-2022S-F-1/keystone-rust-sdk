@@ -50,32 +50,36 @@ impl SimulatedEnclaveMemory {
     }
 
     #[inline]
-    fn pt_idx(addr: usize, level: isize) -> usize {
-        (addr >> (RISCV_PGLEVEL_BITS * level as usize + RISCV_PGSHIFT)) & ((1 << RISCV_PGLEVEL_BITS) - 1)
+    fn pt_idx(addr: usize, level: usize) -> usize {
+        (addr >> (RISCV_PGLEVEL_BITS * level + RISCV_PGSHIFT)) & ((1 << RISCV_PGLEVEL_BITS) - 1)
     }
 
-    fn __ept_continue_walk_create(&mut self, addr: usize, pte: *mut usize) -> usize {
+    fn __ept_continue_walk_create(&mut self, mut t: *mut usize, addr: usize, pte: *mut usize, skip: usize) -> usize {
         let free_ppn = Self::ppn(self.epm_free_list);
         unsafe { *pte = Self::ptd_create(free_ppn); }
         self.epm_free_list += PAGE_SIZE;
-        self.__ept_walk_create(addr)
+        self.__ept_walk_create(t, addr, skip)
     }
 
-    unsafe fn __ept_walk_internal(&mut self, addr: usize, create: isize) -> usize {
-        let mut t = self.root_page_table as *const usize;
-        for i in (0..(VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS).rev() {
-            let idx = Self::pt_idx(addr, i as isize);
-            if *t.offset(idx as isize) & PTE_V == 0 {
-                return if create != 0 { self.__ept_continue_walk_create(addr, t.offset(idx as isize) as *mut usize) } else { 0 }
+    unsafe fn __ept_walk_internal(&mut self, mut t: *mut usize, addr: usize, create: bool, skip: usize) -> usize {
+        for i in (1..=(VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS - skip).rev() {
+            let idx = Self::pt_idx(addr, i);
+            let ptr = t.offset(idx as isize);
+            if *ptr & PTE_V == 0 {
+                return if create {
+                    self.__ept_continue_walk_create(t, addr, ptr as *mut usize, (VA_BITS - RISCV_PGSHIFT) / RISCV_PGLEVEL_BITS - i)
+                } else {
+                    0
+                };
             }
 
-            t = self.read_mem(Self::pte_ppn((*t.offset(idx as isize)) << RISCV_PGSHIFT) as *const u8, PAGE_SIZE) as *const usize;
+            t = self.read_mem((Self::pte_ppn(*ptr) << RISCV_PGSHIFT) as *const u8, PAGE_SIZE) as *mut usize;
         }
-        *t.offset(Self::pt_idx(addr, 0) as isize)
+        t.offset(Self::pt_idx(addr, 0) as isize) as usize
     }
 
-    fn __ept_walk_create(&mut self, addr: usize) -> usize {
-        unsafe { self.__ept_walk_internal(addr, 1) }
+    fn __ept_walk_create(&mut self, mut t: *mut usize, addr: usize, skip: usize) -> usize {
+        unsafe { self.__ept_walk_internal(t, addr, true, skip) }
     }
 
     fn allocate_aligned(size: usize, alignment: usize) -> usize {
@@ -131,7 +135,7 @@ impl Memory for SimulatedEnclaveMemory {
     }
 
     fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
-        let pte = self.__ept_walk_create(va) as *mut usize;
+        let pte = self.__ept_walk_create(self.root_page_table as *mut usize, va, 0) as *mut usize;
         let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
 
         if unsafe { *pte } & PTE_V != 0 {
@@ -168,7 +172,7 @@ impl Memory for SimulatedEnclaveMemory {
 
     fn epm_alloc_vspace(&mut self, mut addr: usize, num_pages: usize) -> usize {
         for count in 0..num_pages {
-            if self.__ept_walk_create(addr) == 0 {
+            if self.__ept_walk_create(self.root_page_table as *mut usize, addr, 0) == 0 {
                 return count;
             }
             addr += PAGE_SIZE;

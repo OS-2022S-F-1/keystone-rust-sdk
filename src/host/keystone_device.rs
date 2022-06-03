@@ -115,11 +115,12 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         encl.eid = self.eid as usize;
         encl.params.untrusted_size = size;
 
-        if ioctl(
+        let res = ioctl(
             self.fd as usize,
             KEYSTONE_IOC_UTM_INIT,
             &mut encl as *mut KeystoneIoctlCreateEnclave as *mut u8
-        ) != 0 {
+        );
+        if res != 0 {
             0
         } else {
             encl.utm_free_ptr
@@ -175,7 +176,7 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
     }
 
     fn map(&mut self, addr: usize, size: usize) -> isize {
-        let ret = mmap(0, (size & (!(1 << 48))) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
+        let ret = mmap(0, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
         assert_ne!(ret, -1);
         ret
     }
