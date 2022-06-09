@@ -1,11 +1,9 @@
 use xmas_elf::{ElfFile, program::ProgramHeader};
+use super::common::PAGE_SIZE;
 
 pub trait KeystoneElfFile {
     fn get_memory_bounds(&self) -> (usize, usize);
-    fn get_total_memory_size(&self) -> usize {
-        let (min, max) = self.get_memory_bounds();
-        max - min
-    }
+    fn get_total_memory_pages(&self) -> usize;
     fn get_program_segment(&self, header: &ProgramHeader) -> *const u8;
 }
 
@@ -31,6 +29,17 @@ impl<'a> KeystoneElfFile for ElfFile<'a> {
         }
 
         (mem_min, mem_max)
+    }
+
+
+    fn get_total_memory_pages(&self) -> usize {
+        let mut pages: usize = 0;
+
+        for header in self.program_iter() {
+            pages += (header.mem_size() as usize + PAGE_SIZE - 1) / PAGE_SIZE;
+        }
+
+        pages
     }
 
     fn get_program_segment(&self, header: &ProgramHeader) -> *const u8 {

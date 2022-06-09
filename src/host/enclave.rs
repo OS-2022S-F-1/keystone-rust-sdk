@@ -27,7 +27,7 @@ impl ElfData {
     pub fn new(eapp_path: &str, runtime_path: &str) -> Self {
         Self {
             runtime_raw: read(runtime_path),
-            enclave_raw: read(eapp_path)
+            enclave_raw: read(eapp_path),
         }
     }
 }
@@ -99,15 +99,19 @@ impl<'a> Enclave<'a> {
         } else {
             &self.runtime_file
         };
-        let (va_min, va_max) = elf.get_memory_bounds();
-        let num_pages = round_down(va_max - va_min, PAGE_BITS) / PAGE_SIZE;
 
-        if self.p_memory.epm_alloc_vspace(va_min, num_pages) != num_pages {
-            println!("failed to allocate vspace");
-            false
-        } else {
-            true
+        for header in elf.program_iter() {
+            if header.mem_size() == 0 {
+                continue;
+            }
+
+            let num_pages = round_up(header.mem_size() as usize, PAGE_BITS) / PAGE_SIZE;
+            if self.p_memory.epm_alloc_vspace(header.virtual_addr() as usize, num_pages) != num_pages {
+                return false;
+            }
         }
+
+        true
     }
 
     fn load_elf(&mut self, eapp: bool) -> Error {
@@ -147,12 +151,12 @@ impl<'a> Enclave<'a> {
                 va += length;
             }
 
-            while va + PAGE_SIZE <= file_end {
+            while va <= file_end - PAGE_SIZE {
                 if !self.p_memory.alloc_page(va, src, mode) {
                     return Error::PageAllocationFailure;
                 }
                 unsafe { src = src.offset(PAGE_SIZE as isize); }
-                va += PAGE_SIZE;
+                va = if va < usize::MAX - PAGE_SIZE { va + PAGE_SIZE } else { usize::MAX };
             }
 
             if va < file_end {
@@ -167,14 +171,14 @@ impl<'a> Enclave<'a> {
                 if !self.p_memory.alloc_page(va, page.as_mut_ptr(), mode) {
                     return Error::PageAllocationFailure;
                 }
-                va += PAGE_SIZE;
+                va = if va < usize::MAX - PAGE_SIZE { va + PAGE_SIZE } else { usize::MAX };
             }
 
             while va < memory_end {
                 if !self.p_memory.alloc_page(va, null_page.as_mut_ptr(), mode) {
                     return Error::PageAllocationFailure;
                 }
-                va += PAGE_SIZE;
+                va = if va < usize::MAX - PAGE_SIZE { va + PAGE_SIZE } else { usize::MAX };
             }
         }
 
@@ -209,8 +213,8 @@ impl<'a> Enclave<'a> {
     fn prepare_enclave(&mut self, alternate_phys_addr: usize) -> bool {
         let min_pages = round_up(self.params.get_free_mem_size() as usize, PAGE_BITS) / PAGE_SIZE
             + calculate_required_pages(
-            self.enclave_file.get_total_memory_size(),
-            self.runtime_file.get_total_memory_size());
+            self.enclave_file.get_total_memory_pages(),
+            self.runtime_file.get_total_memory_pages());
 
         if self.params.is_simulated() {
             self.p_memory.init(self.p_device.clone(), 0, min_pages);
@@ -395,5 +399,5 @@ impl Drop for Enclave<'_> {
 
 #[inline]
 fn calculate_required_pages(eapp_sz: usize, rt_sz: usize) -> usize {
-    eapp_sz / PAGE_SIZE + rt_sz / PAGE_SIZE + 15
+    eapp_sz + rt_sz + 15
 }

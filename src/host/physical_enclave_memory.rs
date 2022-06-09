@@ -221,7 +221,6 @@ impl Memory for PhysicalEnclaveMemory {
             let map_in_utm = phys_addr >= self.utm_phys_addr && phys_addr < self.utm_phys_addr + self.untrusted_size;
 
             if !map_in_epm && (!map_in_utm || level != 1) {
-                println!("1\n");
                 return -1;
             }
 

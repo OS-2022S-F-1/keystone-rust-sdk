@@ -1,4 +1,4 @@
-use core::mem;
+use core::{mem, unreachable};
 use super::sealing::SealingKey;
 
 const SYSCALL_OCALL: usize = 1001;
@@ -38,4 +38,9 @@ pub fn attest_enclave(report: *mut u8, data: *const u8, size: usize) -> usize {
 
 pub fn get_sealing_key(sealing_key_struct: *mut SealingKey, key_ident: *const u8, key_ident_size: usize) -> usize {
     syscall(SYSCALL_GET_SEALING_KEY, sealing_key_struct as usize, mem::size_of::<SealingKey>(), key_ident as usize, key_ident_size, 0)
+}
+
+pub fn eapp_ret(rval: usize) -> ! {
+    syscall(1101, 0, 0, 0, 0, 0);
+    unreachable!("eapp ret");
 }

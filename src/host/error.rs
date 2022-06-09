@@ -1,4 +1,4 @@
-use core::fmt::{Debug, Formatter, Result};
+use core::fmt::{Debug, Result};
 
 #[derive(PartialEq, Debug)]
 pub enum Error {
