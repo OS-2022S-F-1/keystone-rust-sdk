@@ -176,7 +176,8 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
     }
 
     fn map(&mut self, vaddr: usize, size: usize, offset: usize) -> isize {
-        let ret = mmap(vaddr, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, 666, offset);
+        let flags = MAP_SHARED | if vaddr != 0 { MAP_FIXED } else { 0 };
+        let ret = mmap(vaddr, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, flags, 666, offset);
         assert_ne!(ret, -1);
         ret
     }
