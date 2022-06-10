@@ -18,6 +18,7 @@ pub const PROT_WRITE: usize = 0x02;
 pub const PROT_EXEC: usize = 0x04;
 pub const MAP_SHARED: usize = 0x0001;
 pub const MAP_PRIVATE: usize = 0x0002;
+pub const MAP_FIXED: usize = 0x0010;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;

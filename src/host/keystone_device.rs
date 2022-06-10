@@ -1,6 +1,6 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use crate::common::syscall::{ioctl, mmap, PROT_READ, PROT_WRITE, MAP_SHARED};
+use crate::common::syscall::{ioctl, mmap, PROT_READ, PROT_WRITE, MAP_SHARED, MAP_FIXED};
 use crate::println;
 use super::common::{KEYSTONE_ENCLAVE_EDGE_CALL_HOST, KEYSTONE_ENCLAVE_INTERRUPTED, KEYSTONE_ENCLAVE_DONE};
 use super::error::Error;
@@ -176,8 +176,7 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
     }
 
     fn map(&mut self, vaddr: usize, size: usize, offset: usize) -> isize {
-        println!("mmap {:x} {:x}", vaddr, offset);
-        let ret = mmap(vaddr, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, offset);
+        let ret = mmap(vaddr, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, 666, offset);
         assert_ne!(ret, -1);
         ret
     }
