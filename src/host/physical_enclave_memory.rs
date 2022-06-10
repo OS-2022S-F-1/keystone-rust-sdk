@@ -116,18 +116,18 @@ impl Memory for PhysicalEnclaveMemory {
 
     fn read_mem(&mut self, src: *const u8, size: usize) -> usize {
         assert!(self.p_device.is_some());
-        self.p_device.as_ref().unwrap().borrow_mut().map(src as usize - self.start_addr, size) as usize
+        self.p_device.as_ref().unwrap().borrow_mut().map(0, size, src as usize - self.start_addr) as usize
     }
 
-    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize) {
+    fn write_mem(&mut self, va: usize, src: *const u8, dst: *mut u8, size: usize) {
         assert!(self.p_device.is_some());
-        let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(unsafe { dst.offset(-(self.start_addr as isize)) as usize }, size);
+        let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(va, size, unsafe { dst.offset(-(self.start_addr as isize)) as usize });
         unsafe { ptr::copy_nonoverlapping(src, va_dst as *mut u8, size); }
     }
 
     fn alloc_mem(&mut self, _size: usize) -> usize {
         assert!(self.p_device.is_some());
-        self.p_device.as_ref().unwrap().borrow_mut().map(0, PAGE_SIZE) as usize
+        self.p_device.as_ref().unwrap().borrow_mut().map(0, PAGE_SIZE, 0) as usize
     }
 
     fn alloc_utm(&mut self, size: usize) -> usize {
@@ -159,11 +159,11 @@ impl Memory for PhysicalEnclaveMemory {
             },
             RT_FULL => {
                 unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_A | PTE_D) as isize); }
-                self.write_mem(src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
+                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
             },
             USER_FULL => {
                 unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_U | PTE_A | PTE_D) as isize); }
-                self.write_mem(src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
+                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
             },
             UTM_FULL => {
                 assert_eq!(src as usize, 0);

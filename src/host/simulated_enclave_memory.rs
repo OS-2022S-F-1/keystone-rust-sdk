@@ -119,7 +119,7 @@ impl Memory for SimulatedEnclaveMemory {
         src as usize
     }
 
-    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize) {
+    fn write_mem(&mut self, va: usize, src: *const u8, dst: *mut u8, size: usize) {
         unsafe { ptr::copy_nonoverlapping(src, dst, size); }
     }
 
@@ -154,11 +154,11 @@ impl Memory for SimulatedEnclaveMemory {
             },
             RT_FULL => {
                 unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_A | PTE_D) as isize); }
-                self.write_mem(src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
+                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
             },
             USER_FULL => {
                 unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_U | PTE_A | PTE_D) as isize); }
-                self.write_mem(src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
+                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
             },
             UTM_FULL => {
                 assert_eq!(src as usize, 0);

@@ -32,7 +32,7 @@ pub trait Memory: Drop {
     fn new() -> Self where Self: Sized;
     fn init(&mut self, dev: Rc<RefCell<dyn KeystoneDevice>>, phys_addr: usize, min_pages: usize);
     fn read_mem(&mut self, src: *const u8, size: usize) -> usize;
-    fn write_mem(&mut self, src: *const u8, dst: *mut u8, size: usize);
+    fn write_mem(&mut self, va: usize, src: *const u8, dst: *mut u8, size: usize);
     fn alloc_mem(&mut self, size: usize) -> usize;
     fn alloc_utm(&mut self, size: usize) -> usize;
     fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool;

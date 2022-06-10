@@ -21,7 +21,7 @@ pub trait KeystoneDevice: Drop {
     fn destroy(&mut self) -> Error;
     fn run(&mut self, ret: &mut usize) -> Error;
     fn resume(&mut self, ret: &mut usize) -> Error;
-    fn map(&mut self, addr: usize, size: usize) -> isize;
+    fn map(&mut self, vaddr: usize, size: usize, offset: usize) -> isize;
 }
 
 pub struct PhysicalKeystoneDevice {
@@ -175,8 +175,9 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         self.__run(true, ret)
     }
 
-    fn map(&mut self, addr: usize, size: usize) -> isize {
-        let ret = mmap(0, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, addr);
+    fn map(&mut self, vaddr: usize, size: usize, offset: usize) -> isize {
+        println!("mmap {:x} {:x}", vaddr, offset);
+        let ret = mmap(vaddr, (size >> 12 & (1 << 48) - 1) | ((self.eid as usize) << 48), PROT_READ | PROT_WRITE, MAP_SHARED, 666, offset);
         assert_ne!(ret, -1);
         ret
     }
@@ -240,7 +241,7 @@ impl KeystoneDevice for MockKeystoneDevice {
         Error::Success
     }
 
-    fn map(&mut self, _: usize, size: usize) -> isize {
+    fn map(&mut self, _: usize, size: usize, _: usize) -> isize {
         let mut buffer = vec![0u8; size];
         let ret = buffer.as_mut_ptr() as isize;
         self.shared_buffer = Some(buffer);
