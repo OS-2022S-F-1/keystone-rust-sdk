@@ -210,7 +210,7 @@ impl<'a> Enclave<'a> {
         }
     }
 
-    fn prepare_enclave(&mut self, alternate_phys_addr: usize) -> bool {
+    fn prepare_enclave(&mut self, alternate_phys_addr: usize, data: &'a ElfData) -> bool {
         let min_pages = round_up(self.params.get_free_mem_size() as usize, PAGE_BITS) / PAGE_SIZE
             + calculate_required_pages(
             self.enclave_file.get_total_memory_pages(),
@@ -221,7 +221,13 @@ impl<'a> Enclave<'a> {
             return true;
         }
 
-        if self.p_device.borrow_mut().create(min_pages as u64) != Error::Success {
+        if self.p_device.borrow_mut().create(
+            min_pages as u64,
+            data.runtime_raw.as_ptr() as usize,
+            data.runtime_raw.len(),
+            data.enclave_raw.as_ptr() as usize,
+            data.enclave_raw.len()
+        ) != Error::Success {
             return false;
         }
 
@@ -264,36 +270,36 @@ impl<'a> Enclave<'a> {
             ocall_handler: None,
         };
 
-        if !enclave.prepare_enclave(alternate_phys_addr) {
+        if !enclave.prepare_enclave(alternate_phys_addr, data) {
             enclave.destroy();
             return Err(Error::DeviceError);
         }
 
-        if !enclave.map_elf(false) {
-            enclave.destroy();
-            return Err(Error::VSpaceAllocationFailure);
-        }
-
-        enclave.p_memory.start_runtime_mem();
-
-        if enclave.load_elf(false) != Error::Success {
-            println!("failed to load runtime ELF");
-            enclave.destroy();
-            return Err(Error::ELFLoadFailure);
-        }
-
-        if !enclave.map_elf(true) {
-            enclave.destroy();
-            return Err(Error::VSpaceAllocationFailure);
-        }
-
-        enclave.p_memory.start_eapp_mem();
-
-        if enclave.load_elf(true) != Error::Success {
-            println!("failed to load enclave ELF");
-            enclave.destroy();
-            return Err(Error::ELFLoadFailure);
-        }
+        // if !enclave.map_elf(false) {
+        //     enclave.destroy();
+        //     return Err(Error::VSpaceAllocationFailure);
+        // }
+        //
+        // enclave.p_memory.start_runtime_mem();
+        //
+        // if enclave.load_elf(false) != Error::Success {
+        //     println!("failed to load runtime ELF");
+        //     enclave.destroy();
+        //     return Err(Error::ELFLoadFailure);
+        // }
+        //
+        // if !enclave.map_elf(true) {
+        //     enclave.destroy();
+        //     return Err(Error::VSpaceAllocationFailure);
+        // }
+        //
+        // enclave.p_memory.start_eapp_mem();
+        //
+        // if enclave.load_elf(true) != Error::Success {
+        //     println!("failed to load enclave ELF");
+        //     enclave.destroy();
+        //     return Err(Error::ELFLoadFailure);
+        // }
 
         #[cfg(use_freemem)]
         if !enclave.init_stack(DEFAULT_STACK_START, DEFAULT_STACK_SIZE, 0) {
