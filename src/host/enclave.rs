@@ -216,10 +216,10 @@ impl<'a> Enclave<'a> {
             self.enclave_file.get_total_memory_pages(),
             self.runtime_file.get_total_memory_pages());
 
-        if self.params.is_simulated() {
-            self.p_memory.init(self.p_device.clone(), 0, min_pages);
-            return true;
-        }
+        // if self.params.is_simulated() {
+        //     self.p_memory.init(self.p_device.clone(), 0, min_pages);
+        //     return true;
+        // }
 
         if self.p_device.borrow_mut().create(
             min_pages as u64,
@@ -237,7 +237,7 @@ impl<'a> Enclave<'a> {
             self.p_device.borrow().get_phys_addr()
         };
 
-        self.p_memory.init(self.p_device.clone(), phys_addr, min_pages);
+        // self.p_memory.init(self.p_device.clone(), phys_addr, min_pages);
         true
     }
 

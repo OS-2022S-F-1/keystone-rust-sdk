@@ -15,7 +15,7 @@ pub trait KeystoneDevice: Drop {
     fn new() -> Self where Self: Sized;
     fn get_phys_addr(&self) -> usize;
     fn init_device(&mut self, params: &Params) -> bool;
-    fn create(&mut self, min_pages: u64, runtime_vaddr: usize, runtime_size: usize, user_addr: usize, user_size: usize) -> Error;
+    fn create(&mut self, min_pages: u64, runtime_vaddr: usize, runtime_size: usize, user_vaddr: usize, user_size: usize) -> Error;
     fn init_utm(&mut self, size: usize) -> usize;
     fn finalize(&mut self, runtime_phys_addr: usize, eapp_phys_addr: usize, free_phys_addr: usize, params: RuntimeParams) -> Error;
     fn destroy(&mut self) -> Error;
@@ -109,7 +109,6 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
             Error::IoctlErrorCreate
         } else {
             self.eid = encl.eid as isize;
-            self.phys_addr = encl.pt_ptr;
             Error::Success
         }
     }
@@ -134,9 +133,6 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
     fn finalize(&mut self, runtime_phys_addr: usize, eapp_phys_addr: usize, free_phys_addr: usize, params: RuntimeParams) -> Error {
         let mut encl = KeystoneIoctlCreateEnclave::new();
         encl.eid = self.eid as usize;
-        encl.runtime_paddr = runtime_phys_addr;
-        encl.user_paddr = eapp_phys_addr;
-        encl.free_paddr = free_phys_addr;
         encl.params = params;
 
         if ioctl(
