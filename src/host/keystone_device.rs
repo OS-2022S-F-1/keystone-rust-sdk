@@ -90,7 +90,7 @@ impl KeystoneDevice for PhysicalKeystoneDevice {
         true
     }
 
-    fn create(&mut self, min_pages: u64, runtime_vaddr: usize, runtime_size: usize, user_addr: usize, user_size: usize) -> Error {
+    fn create(&mut self, min_pages: u64, runtime_vaddr: usize, runtime_size: usize, user_vaddr: usize, user_size: usize) -> Error {
         let mut encl = KeystoneIoctlCreateEnclave::new();
         encl.min_pages = min_pages as usize;
         encl.runtime_vaddr = runtime_vaddr;
