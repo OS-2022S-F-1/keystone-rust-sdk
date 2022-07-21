@@ -104,12 +104,12 @@ impl Memory for PhysicalEnclaveMemory {
     fn init(&mut self, dev: Rc<RefCell<dyn KeystoneDevice>>, phys_addr: usize, min_pages: usize) {
         self.p_device = Some(dev);
         self.epm_size = PAGE_SIZE * min_pages;
-        self.root_page_table = self.alloc_mem(PAGE_SIZE);
-        for i in 0..PAGE_SIZE {
-            unsafe {
-                *(self.root_page_table as *mut u8).offset(i as isize) = 0u8;
-            }
-        }
+        // self.root_page_table = self.alloc_mem(PAGE_SIZE);
+        // for i in 0..PAGE_SIZE {
+        //     unsafe {
+        //         *(self.root_page_table as *mut u8).offset(i as isize) = 0u8;
+        //     }
+        // }
         self.epm_free_list = phys_addr + PAGE_SIZE;
         self.start_addr = phys_addr;
     }
