@@ -52,7 +52,7 @@ impl<'a> Enclave<'a> {
             return true;
         }
 
-        self.shared_buffer = self.p_device.borrow_mut().map(0, size, 0) as *mut u8;
+        self.shared_buffer = self.p_device.borrow_mut().map(0, size, 0, 0) as *mut u8;
 
         if self.shared_buffer as usize == 0 {
             false

@@ -116,18 +116,18 @@ impl Memory for PhysicalEnclaveMemory {
 
     fn read_mem(&mut self, src: *const u8, size: usize) -> usize {
         assert!(self.p_device.is_some());
-        self.p_device.as_ref().unwrap().borrow_mut().map(0, size, src as usize - self.start_addr) as usize
+        self.p_device.as_ref().unwrap().borrow_mut().map(0, size, 0, src as usize - self.start_addr) as usize
     }
 
     fn write_mem(&mut self, va: usize, src: *const u8, dst: *mut u8, size: usize) {
         assert!(self.p_device.is_some());
-        let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(va, size, unsafe { dst.offset(-(self.start_addr as isize)) as usize });
+        let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(va, size, 0, unsafe { dst.offset(-(self.start_addr as isize)) as usize });
         unsafe { ptr::copy_nonoverlapping(src, va_dst as *mut u8, size); }
     }
 
     fn alloc_mem(&mut self, _size: usize) -> usize {
         assert!(self.p_device.is_some());
-        self.p_device.as_ref().unwrap().borrow_mut().map(0, PAGE_SIZE, 0) as usize
+        self.p_device.as_ref().unwrap().borrow_mut().map(0, PAGE_SIZE, 0, 0) as usize
     }
 
     fn alloc_utm(&mut self, size: usize) -> usize {
@@ -140,34 +140,29 @@ impl Memory for PhysicalEnclaveMemory {
     }
 
     fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
-        let pte = self.__ept_walk_create(self.root_page_table as *mut usize, va, 0) as *mut usize;
         let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
-
-        if unsafe { *pte } & PTE_V != 0 {
-            return true;
-        }
 
         let page_addr = *p_free_list >> PAGE_BITS;
         *p_free_list += PAGE_SIZE;
 
         match mode {
             RT_NOEXEC => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_A | PTE_D) as isize); }
+                self.p_device.as_ref().unwrap().borrow_mut().map((page_addr << PAGE_BITS) - self.start_addr, PAGE_SIZE, 0, 0);
             },
             USER_NOEXEC => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_U | PTE_A | PTE_D) as isize); }
+                self.p_device.as_ref().unwrap().borrow_mut().map((page_addr << PAGE_BITS) - self.start_addr, PAGE_SIZE, PTE_U, 0);
             },
             RT_FULL => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_A | PTE_D) as isize); }
                 self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
             },
             USER_FULL => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_U | PTE_A | PTE_D) as isize); }
-                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
+                assert!(self.p_device.is_some());
+                let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(va, PAGE_SIZE, PTE_U, (page_addr << PAGE_BITS) - self.start_addr);
+                unsafe { ptr::copy_nonoverlapping(src, va_dst as *mut u8, PAGE_SIZE); }
             },
             UTM_FULL => {
                 assert_eq!(src as usize, 0);
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_A | PTE_D) as isize); }
+                self.p_device.as_ref().unwrap().borrow_mut().map((page_addr << PAGE_BITS) - self.start_addr, PAGE_SIZE, 0, 0);
             },
             _ => return false,
         }
