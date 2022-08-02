@@ -317,10 +317,6 @@ impl<'a> Enclave<'a> {
             // return Err(Error::DeviceError);
         }
 
-        if enclave.load_untrusted() != Error::Success {
-            println!("failed to load untrusted");
-        }
-
         let runtime_params: RuntimeParams = RuntimeParams {
             runtime_entry: enclave.runtime_file.header.pt2.entry_point() as usize,
             user_entry: enclave.enclave_file.header.pt2.entry_point() as usize,
@@ -330,9 +326,9 @@ impl<'a> Enclave<'a> {
 
         enclave.p_memory.start_free_mem();
 
-        if enclave.params.is_simulated() {
-            enclave.validate_and_hash_enclave(&runtime_params);
-        }
+        // if enclave.params.is_simulated() {
+        //     enclave.validate_and_hash_enclave(&runtime_params);
+        // }
 
         if enclave.p_device.borrow_mut().finalize(
             enclave.p_memory.get_runtime_phys_addr(),
@@ -343,12 +339,14 @@ impl<'a> Enclave<'a> {
             enclave.destroy();
             return Err(Error::DeviceError);
         }
-
-        if !enclave.map_untrusted(enclave.params.get_untrusted_size() as usize) {
-            println!("failed to finalize enclave - cannot obtain the untrusted buffer pointer");
-            enclave.destroy();
-            return Err(Error::DeviceMemoryMapError);
-        }
+        // if enclave.load_untrusted() != Error::Success {
+        //     println!("failed to load untrusted");
+        // }
+        // if !enclave.map_untrusted(enclave.params.get_untrusted_size() as usize) {
+        //     println!("failed to finalize enclave - cannot obtain the untrusted buffer pointer");
+        //     enclave.destroy();
+        //     return Err(Error::DeviceMemoryMapError);
+        // }
 
         Ok(enclave)
     }
