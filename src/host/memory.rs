@@ -35,7 +35,7 @@ pub trait Memory: Drop {
     fn write_mem(&mut self, va: usize, src: *const u8, dst: *mut u8, size: usize);
     fn alloc_mem(&mut self, size: usize) -> usize;
     fn alloc_utm(&mut self, size: usize) -> usize;
-    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool;
+    fn alloc_page(&mut self, va: usize, size: usize) -> bool;
     fn epm_alloc_vspace(&mut self, addr: usize, num_pages: usize) -> usize;
     fn get_start_addr(&self) -> usize;
     fn get_current_epm_address(&self) -> usize;

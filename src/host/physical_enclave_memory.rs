@@ -139,34 +139,8 @@ impl Memory for PhysicalEnclaveMemory {
         ret
     }
 
-    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
-        let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
-
-        let page_addr = *p_free_list >> PAGE_BITS;
-        *p_free_list += PAGE_SIZE;
-
-        match mode {
-            RT_NOEXEC => {
-                self.p_device.as_ref().unwrap().borrow_mut().map((page_addr << PAGE_BITS) - self.start_addr, PAGE_SIZE, 0, 0);
-            },
-            USER_NOEXEC => {
-                self.p_device.as_ref().unwrap().borrow_mut().map((page_addr << PAGE_BITS) - self.start_addr, PAGE_SIZE, PTE_U, 0);
-            },
-            RT_FULL => {
-                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
-            },
-            USER_FULL => {
-                assert!(self.p_device.is_some());
-                let va_dst = self.p_device.as_ref().unwrap().borrow_mut().map(va, PAGE_SIZE, PTE_U, (page_addr << PAGE_BITS) - self.start_addr);
-                unsafe { ptr::copy_nonoverlapping(src, va_dst as *mut u8, PAGE_SIZE); }
-            },
-            UTM_FULL => {
-                assert_eq!(src as usize, 0);
-                self.p_device.as_ref().unwrap().borrow_mut().map((page_addr << PAGE_BITS) - self.start_addr, PAGE_SIZE, 0, 0);
-            },
-            _ => return false,
-        }
-
+    fn alloc_page(&mut self, va: usize, size: usize) -> bool {
+        self.p_device.as_ref().unwrap().borrow_mut().map(va, size, 0, 0);
         true
     }
 

@@ -134,39 +134,7 @@ impl Memory for SimulatedEnclaveMemory {
         self.utm_free_list
     }
 
-    fn alloc_page(&mut self, va: usize, src: *const u8, mode: usize) -> bool {
-        let pte = self.__ept_walk_create(self.root_page_table as *mut usize, va, 0) as *mut usize;
-        let p_free_list = if mode == UTM_FULL { &mut self.utm_free_list } else { &mut self.epm_free_list };
-
-        if unsafe { *pte } & PTE_V != 0 {
-            return true;
-        }
-
-        let page_addr = *p_free_list >> PAGE_BITS;
-        *p_free_list += PAGE_SIZE;
-
-        match mode {
-            RT_NOEXEC => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_A | PTE_D) as isize); }
-            },
-            USER_NOEXEC => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_U | PTE_A | PTE_D) as isize); }
-            },
-            RT_FULL => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_A | PTE_D) as isize); }
-                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
-            },
-            USER_FULL => {
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_X | PTE_U | PTE_A | PTE_D) as isize); }
-                self.write_mem(va, src, (page_addr << PAGE_BITS) as *mut u8, PAGE_SIZE);
-            },
-            UTM_FULL => {
-                assert_eq!(src as usize, 0);
-                unsafe { *pte = Self::pte_create(page_addr, (PTE_V | PTE_R | PTE_W | PTE_A | PTE_D) as isize); }
-            },
-            _ => return false,
-        }
-
+    fn alloc_page(&mut self, _va: usize, _size: usize) -> bool {
         true
     }
 
