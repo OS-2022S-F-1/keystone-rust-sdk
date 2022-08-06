@@ -1,6 +1,6 @@
-pub const DEFAULT_STACK_SIZE: usize = if cfg!(feature = "riscv_32") { 1024 * 8 } else { 1024 * 16 };
-pub const DEFAULT_STACK_START: usize = if cfg!(feature = "riscv_32") { 0x40000000 } else { 0x0000000040000000 };
-pub const DEFAULT_UNTRUSTED_PTR: u64 = if cfg!(feature = "riscv_32") { 0x80000000 } else { 0xffffffff80000000 };
+pub const DEFAULT_STACK_SIZE: usize = if cfg!(feature = "riscv_32") { 4096 * 8 } else { 4096 * 16 };
+pub const DEFAULT_STACK_START: usize = 0x40000000;
+pub const DEFAULT_UNTRUSTED_PTR: u64 = 0x80000000;
 const DEFAULT_UNTRUSTED_SIZE: u64 = 8192;
 const DEFAULT_FREEMEM_SIZE: u64 = if cfg!(feature = "riscv_32") { 1024 * 512 } else { 1024 * 1024 };
 

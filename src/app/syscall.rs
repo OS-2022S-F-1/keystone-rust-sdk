@@ -41,6 +41,6 @@ pub fn get_sealing_key(sealing_key_struct: *mut SealingKey, key_ident: *const u8
 }
 
 pub fn eapp_ret(rval: usize) -> ! {
-    syscall(1101, 0, 0, 0, 0, 0);
+    syscall(SYSCALL_EXIT, rval, 0, 0, 0, 0);
     unreachable!("eapp ret");
 }

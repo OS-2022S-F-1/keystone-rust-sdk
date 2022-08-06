@@ -47,44 +47,16 @@ pub struct Enclave<'a> {
 }
 
 impl<'a> Enclave<'a> {
-    fn map_untrusted(&mut self, size: usize) -> bool {
-        if size == 0 {
-            return true;
-        }
-
-        self.shared_buffer = self.p_device.borrow_mut().map(0, size, 0, 0) as *mut u8;
-
+    fn map_untrusted(&mut self) -> bool {
+        let untrusted_va = self.params.get_untrusted_mem() as usize;
+        let untrusted_size = self.params.get_untrusted_size() as usize;
+        println!("load untrusted memory from {:x} with size {:x}", untrusted_va, untrusted_size);
+        self.shared_buffer = self.p_device.borrow_mut().map(untrusted_va, untrusted_size, 0, 0) as *mut u8;
         if self.shared_buffer as usize == 0 {
             false
         } else {
-            self.shared_buffer_size = size;
+            self.shared_buffer_size = untrusted_size;
             true
-        }
-    }
-
-    // fn init_stack(&mut self, start: usize, size: usize, is_rt: bool) -> bool {
-    //     let mut nullpage = [0u8; PAGE_SIZE];
-    //     let high_addr = round_up(start, PAGE_BITS);
-    //     let mut va_start_stk = round_down(high_addr - size, PAGE_BITS);
-    //     let stk_pages = (high_addr - va_start_stk) / PAGE_SIZE;
-    //
-    //     for _ in 0..stk_pages {
-    //         if !self.p_memory.alloc_page(
-    //             va_start_stk, nullpage.as_mut_ptr(),
-    //             if is_rt { RT_NOEXEC } else { USER_NOEXEC }
-    //         ) {
-    //             return false;
-    //         }
-    //         va_start_stk += PAGE_SIZE;
-    //     }
-    //     true
-    // }
-
-    fn load_untrusted(&mut self) -> Error {
-        if self.p_memory.alloc_page(self.params.get_untrusted_mem() as usize, self.params.get_untrusted_size() as usize) {
-            Error::Success
-        } else {
-            Error::PageAllocationFailure
         }
     }
 
@@ -109,76 +81,6 @@ impl<'a> Enclave<'a> {
         true
     }
 
-    // fn load_elf(&mut self, eapp: bool) -> Error {
-    //     let elf = if eapp {
-    //         &mut self.enclave_file
-    //     } else {
-    //         &mut self.runtime_file
-    //     };
-    //     let mut null_page = [0u8; PAGE_SIZE];
-    //     let mode = if eapp { USER_FULL } else { RT_FULL };
-    //     for header in elf.program_iter() {
-    //         if header.get_type().unwrap_or(Type::Null) != Type::Load {
-    //             continue
-    //         }
-    //
-    //         let start = header.virtual_addr() as usize;
-    //         let file_end = start + header.file_size() as usize;
-    //         let memory_end = start + header.mem_size() as usize;
-    //         let mut src = elf.get_program_segment(&header) as *const u8;
-    //         let mut va = start;
-    //
-    //         if !is_aligned(va, PAGE_SIZE) {
-    //             let offset = va - page_down(va);
-    //             let length = page_up(va) - va;
-    //             let mut page = [0u8; PAGE_SIZE];
-    //             unsafe {
-    //                 ptr::copy_nonoverlapping(
-    //                     src,
-    //                     page.as_mut_ptr().offset(offset as isize),
-    //                     length
-    //                 );
-    //             }
-    //             if !self.p_memory.alloc_page(page_down(va), page.as_mut_ptr(), mode) {
-    //                 return Error::PageAllocationFailure;
-    //             }
-    //             unsafe { src = src.offset(length as isize); }
-    //             va += length;
-    //         }
-    //
-    //         while va <= file_end - PAGE_SIZE {
-    //             if !self.p_memory.alloc_page(va, src, mode) {
-    //                 return Error::PageAllocationFailure;
-    //             }
-    //             unsafe { src = src.offset(PAGE_SIZE as isize); }
-    //             va = if va < usize::MAX - PAGE_SIZE { va + PAGE_SIZE } else { usize::MAX };
-    //         }
-    //
-    //         if va < file_end {
-    //             let mut page = [0u8; PAGE_SIZE];
-    //             unsafe {
-    //                 ptr::copy_nonoverlapping(
-    //                     src,
-    //                     page.as_mut_ptr(),
-    //                     file_end - va
-    //                 );
-    //             }
-    //             if !self.p_memory.alloc_page(va, page.as_mut_ptr(), mode) {
-    //                 return Error::PageAllocationFailure;
-    //             }
-    //             va = if va < usize::MAX - PAGE_SIZE { va + PAGE_SIZE } else { usize::MAX };
-    //         }
-    //
-    //         while va < memory_end {
-    //             if !self.p_memory.alloc_page(va, null_page.as_mut_ptr(), mode) {
-    //                 return Error::PageAllocationFailure;
-    //             }
-    //             va = if va < usize::MAX - PAGE_SIZE { va + PAGE_SIZE } else { usize::MAX };
-    //         }
-    //     }
-    //
-    //     Error::Success
-    // }
 
     fn validate_and_hash_enclave(&mut self, args: &RuntimeParams) -> Error {
         let ptlevel = RISCV_PGLEVEL_TOP;
@@ -270,39 +172,6 @@ impl<'a> Enclave<'a> {
             return Err(Error::DeviceError);
         }
 
-        // if !enclave.map_elf(false) {
-        //     enclave.destroy();
-        //     return Err(Error::VSpaceAllocationFailure);
-        // }
-        //
-        // enclave.p_memory.start_runtime_mem();
-        //
-        // if enclave.load_elf(false) != Error::Success {
-        //     println!("failed to load runtime ELF");
-        //     enclave.destroy();
-        //     return Err(Error::ELFLoadFailure);
-        // }
-        //
-        // if !enclave.map_elf(true) {
-        //     enclave.destroy();
-        //     return Err(Error::VSpaceAllocationFailure);
-        // }
-        //
-        // enclave.p_memory.start_eapp_mem();
-        //
-        // if enclave.load_elf(true) != Error::Success {
-        //     println!("failed to load enclave ELF");
-        //     enclave.destroy();
-        //     return Err(Error::ELFLoadFailure);
-        // }
-
-        // #[cfg(not(use_freemem))]
-        // if !enclave.init_stack(DEFAULT_STACK_START, DEFAULT_STACK_SIZE, false) {
-        //     println!("failed to init static stack");
-        //     enclave.destroy();
-        //     return Err(Error::PageAllocationFailure);
-        // }
-
         /**
          * 此处 driver 实现与 keystone 有所区别导致检查不能通过，实际无影响
          */
@@ -319,6 +188,12 @@ impl<'a> Enclave<'a> {
             untrusted_size: enclave.params.get_untrusted_size() as usize,
         };
 
+        if !enclave.map_untrusted() {
+            println!("failed to finalize enclave - cannot obtain the untrusted buffer pointer");
+            enclave.destroy();
+            return Err(Error::DeviceMemoryMapError);
+        }
+
         enclave.p_memory.start_free_mem();
 
         // if enclave.params.is_simulated() {
@@ -333,14 +208,6 @@ impl<'a> Enclave<'a> {
         ) != Error::Success {
             enclave.destroy();
             return Err(Error::DeviceError);
-        }
-        if enclave.load_untrusted() != Error::Success {
-            println!("failed to load untrusted");
-        }
-        if !enclave.map_untrusted(enclave.params.get_untrusted_size() as usize) {
-            println!("failed to finalize enclave - cannot obtain the untrusted buffer pointer");
-            enclave.destroy();
-            return Err(Error::DeviceMemoryMapError);
         }
 
         Ok(enclave)
